@@ -21,19 +21,20 @@
 
 
 module axis_wrapper #(
-    parameter integer DATA_WIDTH = 32,
     parameter integer INP_DEPTH=8,
-    parameter integer OUT_DEPTH=8
+    parameter integer OUT_DEPTH=2,
+    parameter integer INPUT_DATA_WIDTH = 32, 
+    parameter integer OUTPUT_DATA_WIDTH = ((INP_DEPTH-1) < 2**$clog2(INP_DEPTH)) ? INPUT_DATA_WIDTH + $clog2(INP_DEPTH) : INPUT_DATA_WIDTH + $clog2(INP_DEPTH) + 1
     )(
         input wire axi_clk,
         input wire axi_reset_n,
         // axis slave interface
         input wire s_axis_valid,
-        input wire [DATA_WIDTH-1:0] s_axis_data,
+        input wire [INPUT_DATA_WIDTH-1:0] s_axis_data,
         output wire s_axis_ready,
         // axis master interface
         output wire m_axis_valid,
-        output wire [DATA_WIDTH-1:0] m_axis_data,
+        output wire [OUTPUT_DATA_WIDTH-1:0] m_axis_data,
         input wire m_axis_ready
     );
     // function called clogb2 that returns an integer which has the value of the ceiling of the log base 2.
@@ -49,11 +50,11 @@ module axis_wrapper #(
     
     integer i;
     
-    reg [DATA_WIDTH-1:0] input_ram [INP_DEPTH-1:0];
-    wire [DATA_WIDTH-1:0] output_ram [OUT_DEPTH-1:0];
+    reg signed [INPUT_DATA_WIDTH-1:0] input_ram [INP_DEPTH-1:0];
+    wire signed [OUTPUT_DATA_WIDTH-1:0] output_ram [OUT_DEPTH-1:0];
     
-    reg [DATA_WIDTH-1:0] m_axis_data_reg;
-    reg [DATA_WIDTH-1:0] s_axis_data_reg;
+    reg [INPUT_DATA_WIDTH-1:0] m_axis_data_reg;
+    reg [OUTPUT_DATA_WIDTH-1:0] s_axis_data_reg;
     
     reg [WR_ADDR_WIDTH:0] current_write_address = {WR_ADDR_WIDTH{1'b0}};
     reg [RD_ADDR_WIDTH:0] current_read_address = {RD_ADDR_WIDTH{1'b0}};
@@ -69,10 +70,11 @@ module axis_wrapper #(
     assign s_axis_data_reg = s_axis_data;
 
     // processing logic
-    genvar index;
-    for(index = 0; index < INP_DEPTH; index = index + 1)
+    genvar g;
+    for (g = 0 ; g < OUT_DEPTH ; g++)
     begin
-        assign output_ram[index] = input_ram[index] - 1;
+        perceptron#(.N(8), .DATA_WIDTH(INPUT_DATA_WIDTH), .RESULT_WIDTH(OUTPUT_DATA_WIDTH))
+            dut(.clk(axi_clk), .data_in(input_ram), .data_out(output_ram[g]));
     end
     
     // write logic
@@ -80,7 +82,7 @@ module axis_wrapper #(
     begin
         if (s_axis_valid & s_axis_ready)
         begin
-            for(i = 0 ; i < DATA_WIDTH/8 ; i = i + 1)
+            for(i = 0 ; i < INPUT_DATA_WIDTH/8 ; i = i + 1)
             begin
                 input_ram[current_write_address][i*8+:8] <= s_axis_data_reg[i*8+:8];
             end
@@ -104,7 +106,7 @@ module axis_wrapper #(
     begin
         if (m_axis_valid & m_axis_ready)
         begin
-            for(i = 0 ; i < DATA_WIDTH/8 ; i = i + 1)
+            for(i = 0 ; i < OUTPUT_DATA_WIDTH/8 ; i = i + 1)
             begin
                 m_axis_data_reg[i*8+:8] <= output_ram[current_read_address][i*8+:8];
             end
