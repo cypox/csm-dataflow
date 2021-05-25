@@ -77,7 +77,7 @@ module axis_wrapper #(
             dut(.clk(axi_clk), .data_in(input_ram), .data_out(output_ram[g]));
     end
 
-    // write logic
+    // read from slave and write to memory logic
     always @(posedge axi_clk)
     begin
         if (s_axis_valid & s_axis_ready)
@@ -101,7 +101,7 @@ module axis_wrapper #(
         end
     end
     
-    // read logic
+    // read from memory and write to master logic
     always @(posedge axi_clk)
     begin
         if (m_axis_valid & m_axis_ready)
