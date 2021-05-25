@@ -76,7 +76,7 @@ module axis_wrapper #(
         perceptron#(.N(8), .DATA_WIDTH(INPUT_DATA_WIDTH), .RESULT_WIDTH(OUTPUT_DATA_WIDTH))
             dut(.clk(axi_clk), .data_in(input_ram), .data_out(output_ram[g]));
     end
-    
+
     // write logic
     always @(posedge axi_clk)
     begin
