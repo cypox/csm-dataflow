@@ -24,7 +24,8 @@ module axis_wrapper #(
     parameter integer INP_DEPTH=8,
     parameter integer OUT_DEPTH=2,
     parameter integer INPUT_DATA_WIDTH = 32, 
-    parameter integer OUTPUT_DATA_WIDTH = ((INP_DEPTH-1) < 2**$clog2(INP_DEPTH)) ? INPUT_DATA_WIDTH + $clog2(INP_DEPTH) : INPUT_DATA_WIDTH + $clog2(INP_DEPTH) + 1
+    parameter integer RESULT_DATA_WIDTH = ((INP_DEPTH-1) < 2**$clog2(INP_DEPTH)) ? INPUT_DATA_WIDTH + $clog2(INP_DEPTH) : INPUT_DATA_WIDTH + $clog2(INP_DEPTH) + 1,
+    parameter integer OUTPUT_DATA_WIDTH = 32
     )(
         input wire axi_clk,
         input wire axi_reset_n,
@@ -51,10 +52,10 @@ module axis_wrapper #(
     integer i;
     
     reg signed [INPUT_DATA_WIDTH-1:0] input_ram [INP_DEPTH-1:0];
-    wire signed [OUTPUT_DATA_WIDTH-1:0] output_ram [OUT_DEPTH-1:0];
+    wire signed [RESULT_DATA_WIDTH-1:0] output_ram [OUT_DEPTH-1:0];
     
-    reg [INPUT_DATA_WIDTH-1:0] m_axis_data_reg;
-    reg [OUTPUT_DATA_WIDTH-1:0] s_axis_data_reg;
+    reg [OUTPUT_DATA_WIDTH-1:0] m_axis_data_reg;
+    reg [INPUT_DATA_WIDTH-1:0] s_axis_data_reg;
 
     reg s_axis_ready_reg;
     reg m_axis_valid_reg;
@@ -154,7 +155,7 @@ module axis_wrapper #(
     genvar g;
     for (g = 0 ; g < OUT_DEPTH ; g++)
     begin
-        perceptron#(.N(8), .DATA_WIDTH(INPUT_DATA_WIDTH), .RESULT_WIDTH(OUTPUT_DATA_WIDTH))
+        perceptron#(.N(8), .DATA_WIDTH(INPUT_DATA_WIDTH), .RESULT_WIDTH(RESULT_DATA_WIDTH))
             dut(.clk(axi_clk), .data_in(input_ram), .data_out(output_ram[g]));
     end
 
