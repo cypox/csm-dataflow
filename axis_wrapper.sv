@@ -55,19 +55,100 @@ module axis_wrapper #(
     
     reg [INPUT_DATA_WIDTH-1:0] m_axis_data_reg;
     reg [OUTPUT_DATA_WIDTH-1:0] s_axis_data_reg;
+
+    reg s_axis_ready_reg;
+    reg m_axis_valid_reg;
     
     reg [WR_ADDR_WIDTH:0] current_write_address = {WR_ADDR_WIDTH{1'b0}};
     reg [RD_ADDR_WIDTH:0] current_read_address = {RD_ADDR_WIDTH{1'b0}};
     
-    wire memory_full = current_write_address >= INP_DEPTH;
-    wire last = current_read_address+1 == OUT_DEPTH;
-    wire finished = current_read_address >= OUT_DEPTH; // all data has been sent to slave, we can start receiving again
+    //wire memory_full = current_write_address >= INP_DEPTH;
+    //wire last = current_read_address+1 == OUT_DEPTH;
+    //wire finished = current_read_address >= OUT_DEPTH; // all data has been sent to slave, we can start receiving again
     
-    assign s_axis_ready = !memory_full | finished;
-    assign m_axis_valid = !s_axis_ready; // WARNING: we start sending when we finish computation not as soon as we finish reading
+    //assign s_axis_ready = !memory_full | finished;
+    //assign m_axis_valid = !s_axis_ready; // WARNING: we start sending when we finish computation not as soon as we finish reading
     
     assign m_axis_data = m_axis_data_reg;
     assign s_axis_data_reg = s_axis_data;
+    assign s_axis_ready = s_axis_ready_reg;
+    assign m_axis_valid = m_axis_valid_reg;
+
+    reg [2:0] delay = 3'b111; // time to wait for processing
+
+    localparam [1:0] // 3 states
+        reading_input = 2'b00,
+        processing = 2'b01,
+        writing_output = 2'b10;
+    reg[1:0] state_reg = reading_input;
+
+    always @ (state_reg)
+    begin
+        case (state_reg)
+            reading_input:
+            begin
+                s_axis_ready_reg = 1'b1;
+                m_axis_valid_reg = 1'b0;
+            end
+            processing:
+            begin
+                s_axis_ready_reg = 1'b0;
+                m_axis_valid_reg = 1'b0;
+            end
+            writing_output:
+            begin
+                s_axis_ready_reg = 1'b0;
+                m_axis_valid_reg = 1'b1;
+            end
+            default:
+            begin
+                s_axis_ready_reg = 1'b0;
+                m_axis_valid_reg = 1'b0;
+            end
+        endcase
+    end
+
+    always @ (posedge axi_clk or negedge axi_reset_n) begin
+    if (!axi_reset_n)
+    begin
+        state_reg <= reading_input;
+        delay <= 3'b111;
+        current_write_address <= {WR_ADDR_WIDTH+1{1'b0}};
+        current_read_address <= {RD_ADDR_WIDTH+1{1'b0}};
+    end
+    else
+        case (state_reg)
+            reading_input:
+            begin
+                if (s_axis_valid)
+                    current_write_address <= current_write_address + 1;
+                if (current_write_address+1 == INP_DEPTH)
+                begin
+                    current_write_address <= {WR_ADDR_WIDTH+1{1'b0}};
+                    state_reg <= processing;
+                end
+            end
+            processing:
+            begin
+                delay <= delay - 1;
+                if (delay == 0)
+                begin
+                    state_reg <= writing_output;
+                    delay <= 3'b111;
+                end
+            end
+            writing_output:
+            begin
+                if (m_axis_ready)
+                    current_read_address <= current_read_address + 1;
+                if (current_read_address+1 == OUT_DEPTH)
+                begin
+                    current_read_address <= {RD_ADDR_WIDTH+1{1'b0}};
+                    state_reg <= reading_input;
+                end
+            end
+        endcase
+    end
 
     // processing logic
     genvar g;
@@ -78,49 +159,20 @@ module axis_wrapper #(
     end
 
     // read from slave and write to memory logic
-    always @(posedge axi_clk)
+    always @(*)
     begin
-        if (s_axis_valid & s_axis_ready)
+        for(i = 0 ; i < INPUT_DATA_WIDTH/8 ; i = i + 1)
         begin
-            for(i = 0 ; i < INPUT_DATA_WIDTH/8 ; i = i + 1)
-            begin
-                input_ram[current_write_address][i*8+:8] <= s_axis_data_reg[i*8+:8];
-            end
-            current_write_address <= current_write_address + 1;
-        end
-        
-        // restart if finished with all data
-        if (last)
-        begin
-            current_write_address <= {WR_ADDR_WIDTH+1{1'b0}};
-        end
-        
-        // reset logic
-        if (!axi_reset_n) begin
-            current_write_address = {WR_ADDR_WIDTH+1{1'b0}};
+            input_ram[current_write_address][i*8+:8] <= s_axis_data_reg[i*8+:8];
         end
     end
     
     // read from memory and write to master logic
-    always @(posedge axi_clk)
+    always @(*)
     begin
-        if (m_axis_valid & m_axis_ready)
+        for(i = 0 ; i < OUTPUT_DATA_WIDTH/8 ; i = i + 1)
         begin
-            for(i = 0 ; i < OUTPUT_DATA_WIDTH/8 ; i = i + 1)
-            begin
-                m_axis_data_reg[i*8+:8] <= output_ram[current_read_address][i*8+:8];
-            end
-            current_read_address <= current_read_address + 1;
-        end
-        
-        if (finished)
-        begin
-            current_read_address = {RD_ADDR_WIDTH+1{1'b0}};
-        end
-        
-        // reset logic
-        if (!axi_reset_n) begin
-            current_read_address = {RD_ADDR_WIDTH+1{1'b0}};
+            m_axis_data_reg[i*8+:8] <= output_ram[current_read_address][i*8+:8];
         end
     end
 
