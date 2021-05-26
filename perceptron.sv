@@ -33,7 +33,7 @@ module perceptron #(parameter
     genvar i;
     for (i = 0 ; i < N-1 ; i ++)
     begin
-        constant_multiplier#(.DATA_WIDTH(DATA_WIDTH), .CONSTANT(3))
+        constant_multiplier#(.DATA_WIDTH(DATA_WIDTH), .CONSTANT(1))
             cm_input_inst(.clk(clk), .data_in(data_in[i]), .data_out(multiplication_output[i]));
     end
     constant_multiplier#(.DATA_WIDTH(DATA_WIDTH), .CONSTANT(1))

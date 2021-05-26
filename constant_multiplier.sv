@@ -20,7 +20,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 
-module constant_multiplier # (parameter integer DATA_WIDTH = 8, parameter integer CONSTANT = 7)
+module constant_multiplier # (parameter integer DATA_WIDTH = 8, parameter integer CONSTANT = 0)
     (
     input clk,
     input [DATA_WIDTH-1:0] data_in,

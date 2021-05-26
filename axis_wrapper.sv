@@ -155,7 +155,7 @@ module axis_wrapper #(
     genvar g;
     for (g = 0 ; g < OUT_DEPTH ; g++)
     begin
-        perceptron#(.N(8), .DATA_WIDTH(INPUT_DATA_WIDTH), .RESULT_WIDTH(RESULT_DATA_WIDTH))
+        perceptron#(.N(INP_DEPTH), .DATA_WIDTH(INPUT_DATA_WIDTH), .RESULT_WIDTH(RESULT_DATA_WIDTH))
             dut(.clk(axi_clk), .data_in(input_ram), .data_out(output_ram[g]));
     end
 
